@@ -931,7 +931,7 @@ pub(crate) fn sync_current_provider_for_app_to_live(
         }
     }
 
-    McpService::sync_all_enabled(state)?;
+    // McpService::sync_all_enabled(state)?;  // [禁用自动 MCP 同步] 切换供应商时不再自动同步 MCP
 
     Ok(())
 }
@@ -1000,7 +1000,7 @@ pub fn sync_current_to_live(state: &AppState) -> Result<(), AppError> {
     }
 
     // MCP sync
-    McpService::sync_all_enabled(state)?;
+    // McpService::sync_all_enabled(state)?;  // [禁用自动 MCP 同步] 切换供应商时不再自动同步 MCP
 
     // Skill sync
     for app_type in AppType::all() {

@@ -1467,7 +1467,7 @@ impl ProviderService {
             } else {
                 write_live_with_common_config(state.db.as_ref(), &app_type, &provider)?;
                 // Sync MCP
-                McpService::sync_all_enabled(state)?;
+                // McpService::sync_all_enabled(state)?;  // [禁用自动 MCP 同步] 切换供应商时不再自动同步 MCP
             }
         }
 
@@ -1831,7 +1831,7 @@ impl ProviderService {
         }
 
         // Sync MCP
-        McpService::sync_all_enabled(state)?;
+        // McpService::sync_all_enabled(state)?;  // [禁用自动 MCP 同步] 切换供应商时不再自动同步 MCP
 
         Ok(result)
     }
