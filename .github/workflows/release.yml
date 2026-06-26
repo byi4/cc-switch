@@ -51,7 +51,13 @@ jobs:
 
       - name: Prepare Tauri signing key
         shell: bash
+        env:
+          CC_SWITCH_DISABLE_UPDATER: true
         run: |
+          if [ "${CC_SWITCH_DISABLE_UPDATER}" = "true" ]; then
+            echo "[SKIP] Updater disabled, no signing key needed"
+            exit 0
+          fi
           if [ -z "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" ]; then
             echo "!! TAURI_SIGNING_PRIVATE_KEY not set, skipping signing"
             exit 0
