@@ -309,7 +309,7 @@ pub fn run() {
 
             // 注册 Updater 插件（桌面端）
             #[cfg(desktop)]
-            {
+            if option_env!("CC_SWITCH_DISABLE_UPDATER").is_none() {
                 if let Err(e) = app
                     .handle()
                     .plugin(tauri_plugin_updater::Builder::new().build())

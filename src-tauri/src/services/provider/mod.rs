@@ -1466,7 +1466,7 @@ impl ProviderService {
             } else {
                 write_live_with_common_config(state.db.as_ref(), &app_type, &provider)?;
                 // Sync MCP
-                McpService::sync_all_enabled(state)?;
+                // McpService::sync_all_enabled(state)?;
             }
         }
 
@@ -1830,7 +1830,7 @@ impl ProviderService {
         }
 
         // Sync MCP
-        McpService::sync_all_enabled(state)?;
+        // McpService::sync_all_enabled(state)?;
 
         Ok(result)
     }

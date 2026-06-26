@@ -931,7 +931,7 @@ pub(crate) fn sync_current_provider_for_app_to_live(
         }
     }
 
-    McpService::sync_all_enabled(state)?;
+    // McpService::sync_all_enabled(state)?;
 
     Ok(())
 }
@@ -1000,7 +1000,7 @@ pub fn sync_current_to_live(state: &AppState) -> Result<(), AppError> {
     }
 
     // MCP sync
-    McpService::sync_all_enabled(state)?;
+    // McpService::sync_all_enabled(state)?;
 
     // Skill sync
     for app_type in AppType::all() {
