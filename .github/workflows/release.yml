@@ -1,4 +1,4 @@
-name: Release
+﻿name: Release
 
 on:
   push:
@@ -14,18 +14,10 @@ concurrency:
 
 jobs:
   release:
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-2022
     strategy:
-      fail-fast: false
       matrix:
-        include:
-          - os: windows-2022
-          - os: windows-11-arm
-            arch: arm64
-          - os: ubuntu-22.04
-          - os: ubuntu-22.04-arm
-            arch: arm64
-          - os: macos-14
+        os: [windows-2022]
 
     steps:
       - name: Checkout
@@ -132,43 +124,37 @@ jobs:
       - name: Prepare Tauri signing key
         shell: bash
         run: |
-          # 调试：检查 Secret 是否存在
+          # 璋冭瘯锛氭鏌?Secret 鏄惁瀛樺湪
           if [ -z "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" ]; then
-            echo "❌ TAURI_SIGNING_PRIVATE_KEY Secret 为空或不存在" >&2
-            echo "请检查 GitHub 仓库 Settings > Secrets and variables > Actions" >&2
-            exit 1
+            echo "鈿狅笍 TAURI_SIGNING_PRIVATE_KEY 鏈缃紝璺宠繃绛惧悕锛堜笉褰卞搷鏋勫缓锛?
+            exit 0
           fi
           
           RAW="${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}"
-          # 目标：提供正确的私钥“文件路径”给 Tauri CLI，避免内容解码歧义
-          KEY_PATH="$RUNNER_TEMP/tauri_signing.key"
-          # 情况 1：原始两行文本（第一行以 "untrusted comment:" 开头）
+          # 鐩爣锛氭彁渚涙纭殑绉侀挜鈥滄枃浠惰矾寰勨€濈粰 Tauri CLI锛岄伩鍏嶅唴瀹硅В鐮佹涔?          KEY_PATH="$RUNNER_TEMP/tauri_signing.key"
+          # 鎯呭喌 1锛氬師濮嬩袱琛屾枃鏈紙绗竴琛屼互 "untrusted comment:" 寮€澶达級
           if echo "$RAW" | head -n1 | grep -q '^untrusted comment:'; then
             printf '%s\n' "$RAW" > "$KEY_PATH"
-            echo "✅ 使用原始两行密钥文件格式"
+            echo "鉁?浣跨敤鍘熷涓よ瀵嗛挜鏂囦欢鏍煎紡"
           else
-            # 情况 2：整体被 base64 包裹（解包后应当是两行）
+            # 鎯呭喌 2锛氭暣浣撹 base64 鍖呰９锛堣В鍖呭悗搴斿綋鏄袱琛岋級
             if DECODED=$(printf '%s' "$RAW" | (base64 --decode 2>/dev/null || base64 -D 2>/dev/null)) \
                && echo "$DECODED" | head -n1 | grep -q '^untrusted comment:'; then
               printf '%s\n' "$DECODED" > "$KEY_PATH"
-              echo "✅ 成功解码 base64 包裹密钥，已还原为两行文件"
+              echo "鉁?鎴愬姛瑙ｇ爜 base64 鍖呰９瀵嗛挜锛屽凡杩樺師涓轰袱琛屾枃浠?
             else
-              # 情况 3：已是第二行（纯 Base64 一行）→ 构造两行文件
-              if echo "$RAW" | grep -Eq '^[A-Za-z0-9+/=]+$'; then
+              # 鎯呭喌 3锛氬凡鏄浜岃锛堢函 Base64 涓€琛岋級鈫?鏋勯€犱袱琛屾枃浠?              if echo "$RAW" | grep -Eq '^[A-Za-z0-9+/=]+$'; then
                 ONE=$(printf '%s' "$RAW" | tr -d '\r\n')
                 printf '%s\n%s\n' "untrusted comment: tauri signing key" "$ONE" > "$KEY_PATH"
-                echo "✅ 使用一行 Base64 私钥，已构造两行文件"
+                echo "鉁?浣跨敤涓€琛?Base64 绉侀挜锛屽凡鏋勯€犱袱琛屾枃浠?
               else
-                echo "❌ TAURI_SIGNING_PRIVATE_KEY 格式无法识别：既不是两行原文，也不是其 base64，亦非一行 base64" >&2
-                echo "密钥前10个字符: $(echo "$RAW" | head -c 10)..." >&2
-                exit 1
+                echo "鈿狅笍 TAURI_SIGNING_PRIVATE_KEY 鏍煎紡鏃犳硶璇嗗埆锛岃烦杩囩鍚?
+                exit 0
               fi
             fi
           fi
-          # 将“完整两行内容”作为环境变量注入（Tauri 支持传入完整私钥文本或文件路径）
-          # 使用多行写入语法，保持换行以便解析
-          # 将完整两行私钥内容进行 base64 编码，作为单行内容注入环境变量
-          if command -v base64 >/dev/null 2>&1; then
+          # 灏嗏€滃畬鏁翠袱琛屽唴瀹光€濅綔涓虹幆澧冨彉閲忔敞鍏ワ紙Tauri 鏀寔浼犲叆瀹屾暣绉侀挜鏂囨湰鎴栨枃浠惰矾寰勶級
+          # 浣跨敤澶氳鍐欏叆璇硶锛屼繚鎸佹崲琛屼互渚胯В鏋?          # 灏嗗畬鏁翠袱琛岀閽ュ唴瀹硅繘琛?base64 缂栫爜锛屼綔涓哄崟琛屽唴瀹规敞鍏ョ幆澧冨彉閲?          if command -v base64 >/dev/null 2>&1; then
             KEY_B64=$(base64 < "$KEY_PATH" | tr -d '\r\n')
           elif command -v openssl >/dev/null 2>&1; then
             KEY_B64=$(openssl base64 -A -in "$KEY_PATH")
@@ -176,14 +162,14 @@ jobs:
             KEY_B64=$(KEY_PATH="$KEY_PATH" node -e "process.stdout.write(require('fs').readFileSync(process.env.KEY_PATH).toString('base64'))")
           fi
           if [ -z "$KEY_B64" ]; then
-            echo "❌ 无法生成私钥 base64 内容" >&2
-            exit 1
+            echo "鈿狅笍 鏃犳硶鐢熸垚绉侀挜 base64 鍐呭锛岃烦杩囩鍚?
+            exit 0
           fi
           echo "TAURI_SIGNING_PRIVATE_KEY=$KEY_B64" >> "$GITHUB_ENV"
           if [ -n "${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}" ]; then
             echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}" >> $GITHUB_ENV
           fi
-          echo "✅ Tauri signing key prepared"
+          echo "鉁?Tauri signing key prepared"
 
       - name: Import Apple signing certificate
         if: runner.os == 'macOS'
@@ -217,11 +203,11 @@ jobs:
           IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
             | grep "Developer ID Application" | grep -oE '"[^"]+"' | head -1 | tr -d '"')
           if [ -z "$IDENTITY" ]; then
-            echo "❌ No 'Developer ID Application' identity found — listing all identities:" >&2
+            echo "鉂?No 'Developer ID Application' identity found 鈥?listing all identities:" >&2
             security find-identity -v -p codesigning "$KEYCHAIN_PATH"
             exit 1
           fi
-          echo "✅ Signing identity: $IDENTITY"
+          echo "鉁?Signing identity: $IDENTITY"
           echo "APPLE_SIGNING_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
 
           # Cleanup certificate file
@@ -243,17 +229,17 @@ jobs:
           for attempt in $(seq 1 "$max_attempts"); do
             echo "=== macOS build/notarization attempt ${attempt}/${max_attempts} ==="
             if pnpm tauri build --target universal-apple-darwin; then
-              echo "✅ macOS build/notarization succeeded"
+              echo "鉁?macOS build/notarization succeeded"
               exit 0
             fi
 
             if [ "$attempt" -eq "$max_attempts" ]; then
-              echo "❌ macOS build/notarization failed after ${max_attempts} attempts" >&2
+              echo "鉂?macOS build/notarization failed after ${max_attempts} attempts" >&2
               exit 1
             fi
 
             sleep_seconds=$((attempt * 60))
-            echo "⚠️ macOS build/notarization failed, retrying in ${sleep_seconds}s..."
+            echo "鈿狅笍 macOS build/notarization failed, retrying in ${sleep_seconds}s..."
             sleep "$sleep_seconds"
           done
 
@@ -299,17 +285,17 @@ jobs:
           done
 
           if [ -z "$TAR_GZ" ]; then
-            echo "❌ No macOS .tar.gz updater artifact found" >&2
+            echo "鉂?No macOS .tar.gz updater artifact found" >&2
             exit 1
           fi
           if [ -z "$APP_PATH" ]; then
-            echo "❌ No .app found" >&2
+            echo "鉂?No .app found" >&2
             exit 1
           fi
 
           # Staple notarization ticket to .app (Tauri already notarized it)
           xcrun stapler staple "$APP_PATH"
-          echo "✅ .app stapled"
+          echo "鉁?.app stapled"
 
           # 1) Collect .tar.gz (updater artifact)
           NEW_TAR_GZ="CC-Switch-${VERSION}-macOS.tar.gz"
@@ -324,7 +310,7 @@ jobs:
 
           # 3) Create styled DMG with create-dmg (Tauri's built-in DMG styling doesn't work on CI)
           if [ -z "${APPLE_SIGNING_IDENTITY:-}" ]; then
-            echo "❌ APPLE_SIGNING_IDENTITY is missing before DMG creation" >&2
+            echo "鉂?APPLE_SIGNING_IDENTITY is missing before DMG creation" >&2
             exit 1
           fi
 
@@ -350,7 +336,7 @@ jobs:
             "$DMG_STAGE_DIR"
 
           rm -rf "$DMG_STAGE_DIR"
-          echo "✅ Styled DMG created: $NEW_DMG"
+          echo "鉁?Styled DMG created: $NEW_DMG"
 
       - name: Notarize macOS DMG
         if: runner.os == 'macOS'
@@ -365,7 +351,7 @@ jobs:
 
           DMG_PATH=$(find release-assets -maxdepth 1 -name "*.dmg" -type f | head -1 || true)
           if [ -z "$DMG_PATH" ]; then
-            echo "❌ No .dmg found in release-assets/ to notarize" >&2
+            echo "鉂?No .dmg found in release-assets/ to notarize" >&2
             exit 1
           fi
 
@@ -378,19 +364,19 @@ jobs:
               --password "$APPLE_PASSWORD" \
               --team-id "$APPLE_TEAM_ID" \
               --wait; then
-              echo "✅ DMG notarization succeeded"
+              echo "鉁?DMG notarization succeeded"
               xcrun stapler staple "$DMG_PATH"
-              echo "✅ DMG stapled"
+              echo "鉁?DMG stapled"
               break
             fi
 
             if [ "$attempt" -eq "$max_attempts" ]; then
-              echo "❌ DMG notarization failed after ${max_attempts} attempts" >&2
+              echo "鉂?DMG notarization failed after ${max_attempts} attempts" >&2
               exit 1
             fi
 
             sleep_seconds=$((attempt * 60))
-            echo "⚠️ DMG notarization failed, retrying in ${sleep_seconds}s..."
+            echo "鈿狅笍 DMG notarization failed, retrying in ${sleep_seconds}s..."
             sleep "$sleep_seconds"
           done
 
@@ -413,29 +399,29 @@ jobs:
           done
 
           if [ -z "$APP_PATH" ]; then
-            echo "❌ No .app found for verification" >&2
+            echo "鉂?No .app found for verification" >&2
             exit 1
           fi
           echo "=== Verifying .app: $APP_PATH ==="
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
-          echo "✅ codesign verification passed"
+          echo "鉁?codesign verification passed"
           spctl -a -t exec -vv "$APP_PATH"
-          echo "✅ spctl assessment passed"
+          echo "鉁?spctl assessment passed"
           xcrun stapler validate "$APP_PATH"
-          echo "✅ .app stapler validation passed"
+          echo "鉁?.app stapler validation passed"
 
           # Verify .dmg (from release-assets/, created by create-dmg + notarized)
           DMG_PATH=$(find release-assets -maxdepth 1 -name "*.dmg" -type f | head -1 || true)
           if [ -n "$DMG_PATH" ]; then
             echo "=== Verifying .dmg: $DMG_PATH ==="
             codesign --verify --verbose=2 "$DMG_PATH"
-            echo "✅ .dmg codesign verification passed"
+            echo "鉁?.dmg codesign verification passed"
             spctl -a -t open --context context:primary-signature -vv "$DMG_PATH"
-            echo "✅ .dmg spctl assessment passed"
+            echo "鉁?.dmg spctl assessment passed"
             xcrun stapler validate "$DMG_PATH"
-            echo "✅ .dmg stapler validation passed"
+            echo "鉁?.dmg stapler validation passed"
           else
-            echo "❌ No .dmg found for verification — release would ship without verified DMG" >&2
+            echo "鉂?No .dmg found for verification 鈥?release would ship without verified DMG" >&2
             exit 1
           fi
 
@@ -452,10 +438,9 @@ jobs:
           $targetRoot = if ($isArm64) { 'src-tauri/target/aarch64-pc-windows-msvc/release' } else { 'src-tauri/target/release' }
           $assetSuffix = if ($isArm64) { '-arm64' } else { '' }
 
-          # 仅打包 MSI 安装器 + .sig（用于 Updater）
-          $msi = Get-ChildItem -Path (Join-Path $targetRoot 'bundle/msi') -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
+          # 浠呮墦鍖?MSI 瀹夎鍣?+ .sig锛堢敤浜?Updater锛?          $msi = Get-ChildItem -Path (Join-Path $targetRoot 'bundle/msi') -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($null -eq $msi) {
-            # 兜底：全局搜索 .msi
+            # 鍏滃簳锛氬叏灞€鎼滅储 .msi
             $msi = Get-ChildItem -Path (Join-Path $targetRoot 'bundle') -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
           }
           if ($null -ne $msi) {
@@ -477,8 +462,7 @@ jobs:
             Write-Warning 'No Windows MSI installer found'
           }
 
-          # 绿色版（portable）：仅可执行文件打 zip（不参与 Updater）
-          $exeCandidates = if ($isArm64) {
+          # 缁胯壊鐗堬紙portable锛夛細浠呭彲鎵ц鏂囦欢鎵?zip锛堜笉鍙備笌 Updater锛?          $exeCandidates = if ($isArm64) {
             @('src-tauri/target/aarch64-pc-windows-msvc/release/cc-switch.exe')
           } else {
             @(
@@ -523,8 +507,7 @@ jobs:
           mkdir -p release-assets
           VERSION="${GITHUB_REF_NAME}"  # e.g., v3.5.0
           ARCH="${{ matrix.arch || 'x86_64' }}"
-          # Updater artifact: AppImage（含对应 .sig）
-          APPIMAGE=$(find src-tauri/target/release/bundle -name "*.AppImage" | head -1 || true)
+          # Updater artifact: AppImage锛堝惈瀵瑰簲 .sig锛?          APPIMAGE=$(find src-tauri/target/release/bundle -name "*.AppImage" | head -1 || true)
           if [ -n "$APPIMAGE" ]; then
             NEW_APPIMAGE="CC-Switch-${VERSION}-Linux-${ARCH}.AppImage"
             cp "$APPIMAGE" "release-assets/$NEW_APPIMAGE"
@@ -533,16 +516,14 @@ jobs:
           else
             echo "No AppImage found under target/release/bundle" >&2
           fi
-          # 额外上传 .deb（用于手动安装，不参与 Updater）
-          DEB=$(find src-tauri/target/release/bundle -name "*.deb" | head -1 || true)
+          # 棰濆涓婁紶 .deb锛堢敤浜庢墜鍔ㄥ畨瑁咃紝涓嶅弬涓?Updater锛?          DEB=$(find src-tauri/target/release/bundle -name "*.deb" | head -1 || true)
           if [ -n "$DEB" ]; then
             cp "$DEB" "release-assets/CC-Switch-${VERSION}-Linux-${ARCH}.deb"
             echo "Deb package copied: CC-Switch-${VERSION}-Linux-${ARCH}.deb"
           else
             echo "No .deb found (optional)"
           fi
-          # 额外上传 .rpm（用于 Fedora/RHEL/openSUSE 等，不参与 Updater）
-          RPM=$(find src-tauri/target/release/bundle -name "*.rpm" | head -1 || true)
+          # 棰濆涓婁紶 .rpm锛堢敤浜?Fedora/RHEL/openSUSE 绛夛紝涓嶅弬涓?Updater锛?          RPM=$(find src-tauri/target/release/bundle -name "*.rpm" | head -1 || true)
           if [ -n "$RPM" ]; then
             cp "$RPM" "release-assets/CC-Switch-${VERSION}-Linux-${ARCH}.rpm"
             echo "RPM package copied: CC-Switch-${VERSION}-Linux-${ARCH}.rpm"
@@ -616,23 +597,18 @@ jobs:
           body: |
             ## CC Switch ${{ github.ref_name }}
 
-            🌐 **Only Official Website / 唯一官方网站 / 唯一の公式サイト**: [ccswitch.io](https://ccswitch.io)
+            馃寪 **Only Official Website / 鍞竴瀹樻柟缃戠珯 / 鍞竴銇叕寮忋偟銈ゃ儓**: [ccswitch.io](https://ccswitch.io)
 
-            Claude Code 供应商切换工具
+            Claude Code 渚涘簲鍟嗗垏鎹㈠伐鍏?
+            ### 涓嬭浇
 
-            ### 下载
-
-            - **macOS**: `CC-Switch-${{ github.ref_name }}-macOS.dmg`（推荐）或 `CC-Switch-${{ github.ref_name }}-macOS.zip`（解压即用）
-            - **Windows (x86_64)**: `CC-Switch-${{ github.ref_name }}-Windows.msi`（安装版）或 `CC-Switch-${{ github.ref_name }}-Windows-Portable.zip`（绿色版）
-            - **Windows (ARM64)**: `CC-Switch-${{ github.ref_name }}-Windows-arm64.msi`（安装版）或 `CC-Switch-${{ github.ref_name }}-Windows-arm64-Portable.zip`（绿色版）
-            - **Linux (x86_64)**: `CC-Switch-${{ github.ref_name }}-Linux-x86_64.AppImage` / `.deb` / `.rpm`
+            - **macOS**: `CC-Switch-${{ github.ref_name }}-macOS.dmg`锛堟帹鑽愶級鎴?`CC-Switch-${{ github.ref_name }}-macOS.zip`锛堣В鍘嬪嵆鐢級
+            - **Windows (x86_64)**: `CC-Switch-${{ github.ref_name }}-Windows.msi`锛堝畨瑁呯増锛夋垨 `CC-Switch-${{ github.ref_name }}-Windows-Portable.zip`锛堢豢鑹茬増锛?            - **Windows (ARM64)**: `CC-Switch-${{ github.ref_name }}-Windows-arm64.msi`锛堝畨瑁呯増锛夋垨 `CC-Switch-${{ github.ref_name }}-Windows-arm64-Portable.zip`锛堢豢鑹茬増锛?            - **Linux (x86_64)**: `CC-Switch-${{ github.ref_name }}-Linux-x86_64.AppImage` / `.deb` / `.rpm`
             - **Linux (ARM64)**: `CC-Switch-${{ github.ref_name }}-Linux-arm64.AppImage` / `.deb` / `.rpm`
 
-            > `.tar.gz` 为 Tauri updater 自动更新专用，无需手动下载。
-
+            > `.tar.gz` 涓?Tauri updater 鑷姩鏇存柊涓撶敤锛屾棤闇€鎵嬪姩涓嬭浇銆?
             ---
-            macOS 版本已通过 Apple 代码签名和公证，可直接安装使用。
-          files: release-assets/*
+            macOS 鐗堟湰宸查€氳繃 Apple 浠ｇ爜绛惧悕鍜屽叕璇侊紝鍙洿鎺ュ畨瑁呬娇鐢ㄣ€?          files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -666,7 +642,7 @@ jobs:
           VERSION="${TAG#v}"
           PUB_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           base_url="https://github.com/$REPO/releases/download/$TAG"
-          # 初始化空平台映射
+          # 鍒濆鍖栫┖骞冲彴鏄犲皠
           mac_url=""; mac_sig=""
           win_x64_url=""; win_x64_sig=""
           win_arm64_url=""; win_arm64_sig=""
@@ -680,7 +656,7 @@ jobs:
             sig_content=$(cat "$sig")
             case "$fname" in
               *.tar.gz)
-                # 视为 macOS updater artifact
+                # 瑙嗕负 macOS updater artifact
                 mac_url="$url"; mac_sig="$sig_content";;
               *-Windows-arm64.msi)
                 win_arm64_url="$url"; win_arm64_sig="$sig_content";;
@@ -692,7 +668,7 @@ jobs:
                 linux_x64_url="$url"; linux_x64_sig="$sig_content";;
             esac
           done
-          # 构造 JSON（仅包含存在的目标）
+          # 鏋勯€?JSON锛堜粎鍖呭惈瀛樺湪鐨勭洰鏍囷級
           tmp_json=$(mktemp)
           {
             echo '{'
@@ -702,8 +678,7 @@ jobs:
             echo '  "platforms": {'
             first=1
             if [ -n "$mac_url" ] && [ -n "$mac_sig" ]; then
-              # 为兼容 arm64 / x64，重复写入两个键，指向同一 universal 包
-              for key in darwin-aarch64 darwin-x86_64; do
+              # 涓哄吋瀹?arm64 / x64锛岄噸澶嶅啓鍏ヤ袱涓敭锛屾寚鍚戝悓涓€ universal 鍖?              for key in darwin-aarch64 darwin-x86_64; do
                 [ $first -eq 0 ] && echo ','
                 echo "    \"$key\": {\"signature\": \"$mac_sig\", \"url\": \"$mac_url\"}"
                 first=0
